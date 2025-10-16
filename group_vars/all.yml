@@ -1,0 +1,6 @@
+
+probeweave_output_dir: output
+probeweave_plugins_enabled:
+  hardware_lldp: true
+  software_os:  true
+  app_openstack: true

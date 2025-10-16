@@ -1,0 +1,56 @@
+
+- name: Ensure output directory exists (control node)
+  delegate_to: localhost
+  run_once: true
+  file:
+    path: "{{ probeweave_output_dir }}"
+    state: directory
+    mode: "0755"
+
+- name: Compose per-host documents
+  delegate_to: localhost
+  run_once: true
+  vars:
+    all_hosts: "{{ groups['all'] | default([]) }}"
+  set_fact:
+    _pw_docs: >-
+      {{
+        dict( (all_hosts | map('community.general.dict_kv',
+              'key','value') | list) )
+        if false else
+        dict( (item, {
+            'schema': '1.0',
+            'host': item,
+            'timestamp': lookup('pipe','date -u +%Y-%m-%dT%H:%M:%SZ'),
+            'results': hostvars[item].probeweave | default({})
+          }) for item in all_hosts )
+      }}
+
+- name: Write one JSON per host
+  delegate_to: localhost
+  run_once: true
+  loop: "{{ _pw_docs | dict2items }}"
+  loop_control: { label: "{{ item.key }}" }
+  copy:
+    dest: "{{ probeweave_output_dir }}/{{ item.key }}.json"
+    content: "{{ item.value | to_nice_json }}"
+
+- name: Append to rollup JSONL
+  delegate_to: localhost
+  run_once: true
+  vars:
+    all_hosts: "{{ groups['all'] | default([]) }}"
+  lineinfile:
+    path: "{{ probeweave_output_dir }}/probeweave.jsonl"
+    create: true
+    line: >-
+      {{
+        {
+          'schema': '1.0',
+          'host': item,
+          'timestamp': lookup('pipe','date -u +%Y-%m-%dT%H:%M:%SZ'),
+          'results': hostvars[item].probeweave | default({})
+        } | to_json
+      }}
+  loop: "{{ all_hosts }}"
+  loop_control: { label: "{{ item }}" }

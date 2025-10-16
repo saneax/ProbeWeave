@@ -1,0 +1,73 @@
+
+- name: Ensure lldpd present
+  become: true
+  package:
+    name: lldpd
+    state: present
+  register: _pw_lldpd_pkg
+  failed_when: false
+
+- name: Check lldpctl availability
+  changed_when: false
+  failed_when: false
+  command: bash -lc "command -v lldpctl"
+  register: _pw_has_lldpctl
+
+- name: Run lldpctl in JSON
+  when: _pw_has_lldpctl.rc == 0
+  changed_when: false
+  register: _pw_lldp_raw
+  command: lldpctl -f json
+
+- name: Normalize LLDP (present)
+  when: _pw_has_lldpctl.rc == 0 and _pw_lldp_raw.rc == 0
+  vars:
+    parsed: "{{ (_pw_lldp_raw.stdout | from_json) | default({}) }}"
+    ifaces: "{{ (parsed.lldp.interface | default({})) }}"
+    interfaces: >-
+      {{
+        dict( (ifaces | dict2items) | map('community.general.dict_kv','key','value') | map('list') | map('first') | map('regex_replace','^','') | list )
+        if false else
+        dict(
+          (item.key,
+            (
+              (item.value.port is mapping)
+              | ternary([item.value.port], (item.value.port | default([])))
+            )
+            | map('combine', {
+                'neighbor_system': (itemx.chassis.name | default('')),
+                'neighbor_mgmt_ip': (itemx.chassis['mgmt-ip'] | default('')),
+                'neighbor_port': (itemx.id.value | default('')),
+                'vlan': ( (itemx.vlan is mapping) | ternary(itemx.vlan['vlan-id'] | default(''), '') )
+              })
+            | list
+          )
+          for item in (ifaces | dict2items)
+          for itemx in []
+        )
+      }}
+  set_fact:
+    probeweave: >-
+      {{
+        (probeweave | default({})) |
+        combine(
+          {'hardware': {'lldp': {'present': true, 'interfaces': interfaces}}},
+          recursive=True
+        )
+      }}
+
+- name: Note LLDP absence / failure
+  when: _pw_has_lldpctl.rc != 0 or (_pw_lldp_raw is defined and _pw_lldp_raw.rc != 0)
+  set_fact:
+    probeweave: >-
+      {{
+        (probeweave | default({})) |
+        combine(
+          {'hardware': {'lldp': {
+            'present': false,
+            'reason': (_pw_has_lldpctl.rc != 0) | ternary('lldpctl_not_found', 'lldpctl_failed'),
+            'rc': (_pw_lldp_raw.rc | default(_pw_has_lldpctl.rc | default(-1)))
+          }}},
+          recursive=True
+        )
+      }}

@@ -1,0 +1,42 @@
+
+- name: Gather minimal facts (network, hardware, OS)
+  setup:
+    gather_subset:
+      - 'min'
+      - 'network'
+      - 'hardware'
+
+- name: Read /etc/os-release (if present)
+  register: _pw_osr
+  changed_when: false
+  failed_when: false
+  slurp:
+    src: /etc/os-release
+
+- name: Normalize OS facts
+  vars:
+    os_release_text: "{{ (_pw_osr.content | default('') | b64decode) }}"
+    os_release_kv: >-
+      {{
+        dict(
+          (os_release_text.splitlines()
+          | select('search', '='))
+          | map('regex_replace','^([^=]+)=(.*)$','\1|\2')
+          | map('split','|',2)
+          | list
+        )
+      }}
+  set_fact:
+    probeweave: >-
+      {{
+        (probeweave | default({})) |
+        combine(
+          {'software': {'os': {
+            'os_release': os_release_kv | default({}),
+            'kernel': ansible_kernel | default(''),
+            'arch': ansible_architecture | default(''),
+            'hostname': inventory_hostname
+          }}},
+          recursive=True
+        )
+      }}

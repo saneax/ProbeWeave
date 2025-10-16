@@ -1,0 +1,35 @@
+
+- hosts: all
+  gather_facts: false
+  any_errors_fatal: true
+  vars:
+    enable_hardware_lldp: "{{ probeweave_plugins_enabled.hardware_lldp }}"
+    enable_software_os:  "{{ probeweave_plugins_enabled.software_os }}"
+    enable_app_openstack: "{{ probeweave_plugins_enabled.app_openstack }}"
+  tasks:
+    - name: Hardware LLDP
+      when: enable_hardware_lldp | bool
+      tags: [hardware, lldp]
+      import_role:
+        name: probeweave.hardware_lldp
+
+    - name: Software OS
+      when: enable_software_os | bool
+      tags: [software, os]
+      import_role:
+        name: probeweave.software_os
+
+    - name: App OpenStack
+      when: enable_app_openstack | bool
+      tags: [app, openstack]
+      import_role:
+        name: probeweave.app_openstack
+
+- hosts: localhost
+  gather_facts: false
+  any_errors_fatal: true
+  tasks:
+    - name: Aggregate & write ProbeWeave artifacts
+      tags: [aggregate]
+      import_role:
+        name: probeweave.aggregate

@@ -1,0 +1,66 @@
+
+- name: Detect podman
+  changed_when: false
+  failed_when: false
+  command: podman --version
+  register: _pw_has_podman
+
+- name: List running containers (podman)
+  when: _pw_has_podman.rc == 0
+  changed_when: false
+  register: _pw_podman_ps
+  command: podman ps --format {{'{{.Names}}'}}
+
+- name: Normalize services list
+  set_fact:
+    _pw_services: "{{ (_pw_podman_ps.stdout_lines | default([])) if (_pw_podman_ps is defined) else [] }}"
+
+- name: Candidate config files
+  set_fact:
+    _pw_conf_candidates:
+      - /etc/nova/nova.conf
+      - /etc/neutron/neutron.conf
+      - /var/lib/config-data/puppet-generated/nova/etc/nova/nova.conf
+      - /var/lib/config-data/puppet-generated/neutron/etc/neutron/neutron.conf
+
+- name: Slurp existing configs
+  register: _pw_slurped
+  loop: "{{ _pw_conf_candidates }}"
+  loop_control: { label: "{{ item }}" }
+  failed_when: false
+  changed_when: false
+  slurp:
+    src: "{{ item }}"
+
+- name: Build redacted conf map
+  vars:
+    _pw_pairs: >-
+      {{
+        _pw_slurped.results
+        | selectattr('failed','!=', True)
+        | selectattr('content','defined')
+        | map(attribute='item') | list
+        | zip(
+            _pw_slurped.results
+            | selectattr('failed','!=', True)
+            | selectattr('content','defined')
+            | map(attribute='content')
+            | map('b64decode')
+            | map('regex_replace','(?i)(password|secret|token|key)\s*=\s*[^\n]+','\1=***REDACTED***')
+            | list
+          )
+        | list
+      }}
+    _pw_conf_map: "{{ dict(_pw_pairs) }}"
+  set_fact:
+    probeweave: >-
+      {{
+        (probeweave | default({})) |
+        combine(
+          {'app': {'openstack': {
+            'services': _pw_services | default([]),
+            'configs': _pw_conf_map | default({})
+          }}},
+          recursive=True
+        )
+      }}
