@@ -1,0 +1,3 @@
+ca-certificates [platform:rpm]
+iproute [platform:rpm]
+procps-ng [platform:rpm]

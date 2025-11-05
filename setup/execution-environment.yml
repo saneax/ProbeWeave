@@ -1,0 +1,26 @@
+
+version: 3
+
+images:
+  base_image:
+    # UBI-based image; uses microdnf, not dnf
+    name: quay.io/ansible/creator-ee:latest
+
+dependencies:
+  galaxy:
+    collections:
+      - name: community.general
+      - name: openstack.cloud
+  python: requirements.txt
+  system: bindep.txt
+
+options:
+  package_manager_path: /usr/bin/microdnf
+  skip_ansible_check: false
+
+additional_build_steps:
+  prepend_base:
+    - RUN microdnf -y update || true
+  append_final:
+    - RUN ansible-galaxy collection list
+    - RUN python3 -c "import sys; print('Python:', sys.version)"
