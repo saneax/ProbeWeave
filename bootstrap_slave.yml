@@ -1,0 +1,60 @@
+---
+- name: Bootstrap Jenkins Slave for GNS3 & ProbeWeave
+  hosts: localhost
+  become: true
+  tasks:
+    - name: Enable CRB and EPEL repos
+      shell: |
+        dnf install -y epel-release
+        dnf config-manager --set-enabled crb
+
+    - name: Install System Dependencies
+      package:
+        name:
+          - python3-devel
+          - python3-pip
+          - gcc
+          - libpcap-devel
+          - cmake
+          - qemu-kvm
+          - vpcs
+          - ubridge
+          - telnet
+          - curl
+          - xfsprogs # for some qemu images
+        state: present
+
+    - name: Install GNS3 Server and Python Tools
+      pip:
+        name:
+          - gns3-server
+          - gns3fy
+          - pydantic<1.9
+          - requests
+          - PyYAML
+          - pytest
+        executable: pip3
+
+    - name: Ensure ubridge has proper permissions
+      file:
+        path: /usr/bin/ubridge
+        mode: '4755'
+
+    - name: Check if GNS3 Server is running
+      uri:
+        url: http://localhost:3080/v2/version
+      register: _gns3_check
+      ignore_errors: true
+
+    - name: Start GNS3 Server Daemon
+      shell: "gns3server --daemon"
+      when: _gns3_check.failed
+      become: false # Run as the jenkins user
+
+    - name: Wait for GNS3 Server to be ready
+      uri:
+        url: http://localhost:3080/v2/version
+      register: _gns3_ready
+      until: _gns3_ready.status == 200
+      retries: 10
+      delay: 2

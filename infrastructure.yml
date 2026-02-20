@@ -1,0 +1,28 @@
+setup:
+  project_name: "probeweave_test"
+  nodes:
+    - name: "switch-1"
+      template: "Ethernet switch"
+      groups: ["switches"]
+    
+    - name: "pc-1"
+      template: "Alpine-Linux"
+      groups: ["compute"]
+      ansible_user: "root"
+      ansible_password: "" # Default for Alpine
+      mgmt_ip: "192.168.122.10"
+      mgmt_mask: "255.255.255.0"
+      mgmt_gateway: "192.168.122.1"
+
+    - name: "pc-2"
+      template: "Alpine-Linux"
+      groups: ["compute"]
+      ansible_user: "root"
+      ansible_password: ""
+      mgmt_ip: "192.168.122.11"
+      mgmt_mask: "255.255.255.0"
+      mgmt_gateway: "192.168.122.1"
+
+  links:
+    - ["switch-1", "Ethernet0", "pc-1", "Ethernet0"]
+    - ["switch-1", "Ethernet1", "pc-2", "Ethernet0"]
