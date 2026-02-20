@@ -1,28 +1,54 @@
 setup:
-  project_name: "probeweave_test"
+  project_name: "probeweave_complex_lab"
   nodes:
-    - name: "switch-1"
+    # Infrastructure Nodes
+    - name: "lan-switch"
       template: "Ethernet switch"
       groups: ["switches"]
-    
-    - name: "pc-1"
-      template: "Alpine-Linux"
-      groups: ["compute"]
-      ansible_user: "root"
-      ansible_password: "" # Default for Alpine
-      mgmt_ip: "192.168.122.10"
-      mgmt_mask: "255.255.255.0"
-      mgmt_gateway: "192.168.122.1"
 
-    - name: "pc-2"
+    - name: "cloud-switch"
+      template: "Ethernet switch"
+      groups: ["switches"]
+
+    - name: "nat-gateway"
+      template: "NAT"
+      groups: ["gateways"]
+
+    # Compute Nodes (Dual-NIC)
+    - name: "node-1"
       template: "Alpine-Linux"
       groups: ["compute"]
-      ansible_user: "root"
-      ansible_password: ""
-      mgmt_ip: "192.168.122.11"
-      mgmt_mask: "255.255.255.0"
+      mgmt_ip: "192.168.122.10"
+      mgmt_interface: "eth1"
       mgmt_gateway: "192.168.122.1"
+      ansible_user: "root"
+
+    - name: "node-2"
+      template: "Alpine-Linux"
+      groups: ["compute"]
+      mgmt_ip: "192.168.122.11"
+      mgmt_interface: "eth1"
+      mgmt_gateway: "192.168.122.1"
+      ansible_user: "root"
+
+    - name: "node-3"
+      template: "Alpine-Linux"
+      groups: ["compute"]
+      mgmt_ip: "192.168.122.12"
+      mgmt_interface: "eth1"
+      mgmt_gateway: "192.168.122.1"
+      ansible_user: "root"
 
   links:
-    - ["switch-1", "Ethernet0", "pc-1", "Ethernet0"]
-    - ["switch-1", "Ethernet1", "pc-2", "Ethernet0"]
+    # Internal LAN Connectivity (NIC 0)
+    - ["lan-switch", "Ethernet0", "node-1", "Ethernet0"]
+    - ["lan-switch", "Ethernet1", "node-2", "Ethernet0"]
+    - ["lan-switch", "Ethernet2", "node-3", "Ethernet0"]
+
+    # Cloud/Management Connectivity (NIC 1)
+    - ["cloud-switch", "Ethernet0", "node-1", "Ethernet1"]
+    - ["cloud-switch", "Ethernet1", "node-2", "Ethernet1"]
+    - ["cloud-switch", "Ethernet2", "node-3", "Ethernet1"]
+    
+    # External Access via NAT
+    - ["nat-gateway", "nat0", "cloud-switch", "Ethernet7"]

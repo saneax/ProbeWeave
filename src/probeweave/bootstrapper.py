@@ -36,6 +36,7 @@ class NodeBootstrapper:
             if not node:
                 continue
 
+            mgmt_iface = node_cfg.get("mgmt_interface", "eth0")
             print(f"Connecting to {name} on localhost:{node.console}...")
             try:
                 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -45,8 +46,8 @@ class NodeBootstrapper:
                 time.sleep(1)
 
                 cmds = [
-                    f"ip addr add {node_cfg['mgmt_ip']}/24 dev eth0",
-                    "ip link set eth0 up",
+                    f"ip addr add {node_cfg['mgmt_ip']}/24 dev {mgmt_iface}",
+                    f"ip link set {mgmt_iface} up",
                     f"ip route add default via {node_cfg['mgmt_gateway']}",
                     "echo 'nameserver 8.8.8.8' > /etc/resolv.conf",
                     "apk update && apk add python3 openssh",

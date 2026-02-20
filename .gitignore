@@ -1,4 +1,4 @@
 *.log
 site-artifact*.json
 alpine*
-
+.fact_cache/
