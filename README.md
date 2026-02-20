@@ -1,34 +1,68 @@
+# ProbeWeave — GNS3-Native System Crawler
 
-# ProbeWeave — Ansible-native starter
+Agentless system crawler that gathers deep hardware/software/app facts using Ansible roles and GNS3 simulation.
 
-Agentless system crawler that gathers deep hardware/software/app facts using plain Ansible roles.
-Artifacts are written to `output/` on the control node.
+## Project Structure
 
-## Quick start
+```
+├── src/probeweave/       # Application Suite
+│   ├── common/           # Shared GNS3 & Config utilities
+│   ├── provisioner.py    # GNS3 Topology Builder
+│   ├── bootstrapper.py   # Serial Console Configurator
+│   ├── inventory.py      # Dynamic Ansible Inventory
+│   └── ...
+├── tests/                # Test Suite
+├── roles/                # Ansible Roles (Crawl Logic)
+├── infrastructure.yml    # Datacenter Blueprint (YAML)
+├── Jenkinsfile           # CI/CD Orchestration
+└── tox.ini               # Test & Lint Automation
+```
+
+## Quick Start
+
+### 1. Provision & Crawl
+```bash
+# Set PYTHONPATH
+export PYTHONPATH=$PYTHONPATH:$(pwd)/src
+
+# Provision the GNS3 Lab
+python3 -m probeweave.provisioner
+
+# Bootstrap Networking/SSH
+python3 -m probeweave.bootstrapper
+
+# Run the ProbeWeave Crawler
+ansible-playbook -i src/probeweave/inventory.py site.yml
+```
+
+### 2. Testing & Quality
+We use `tox` to run the test suite across multiple environments and `ruff` for linting.
 
 ```bash
-cd /mnt/data/probeweave-ansible
-ansible-playbook site.yml
+# Run all tests and linters
+tox
+
+# Run only linting
+tox -e lint
 ```
 
-### Run only hardware LLDP + aggregate
-```bash
-ansible-playbook site.yml -t hardware,aggregate
-```
+## Features
+- **GNS3 Integration**: Automated topology building from YAML.
+- **Serial Bootstrap**: Injects network config without pre-existing SSH.
+- **Dynamic Inventory**: Bridges GNS3 state directly to Ansible.
+- **IPMI Simulation**: Virtual BMC for power management testing.
+- **Jenkins Ready**: Complete pipeline for remote AlmaLinux slaves.
 
-### Disable OpenStack plugin
-```bash
-ansible-playbook site.yml -e probeweave_plugins_enabled.app_openstack=false
-```
-
-## Layout
-```
-inventories/
-group_vars/
-roles/
-  probeweave.hardware_lldp/
-  probeweave.software_os/
-  probeweave.app_openstack/
-  probeweave.aggregate/
-output/
+## Infrastructure Blueprint (`infrastructure.yml`)
+Describe your entire datacenter in YAML:
+```yaml
+setup:
+  project_name: "probeweave_test"
+  nodes:
+    - name: "pc-1"
+      template: "Alpine-Linux"
+      mgmt_ip: "192.168.122.10"
+      mgmt_gateway: "192.168.122.1"
+  links:
+    - ["switch-1", "Ethernet0", "pc-1", "Ethernet0"]
 ```

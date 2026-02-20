@@ -23,44 +23,42 @@ pipeline {
 
         stage('Pre-Deployment Cleanup') {
             steps {
-                echo "Cleaning up past deployments (if any)..."
-                // Run the cleanup script now that gns3-server and venv are ready
-                sh "${VENV_PATH}/bin/python3 cleanup_gns3.py probeweave_test"
+                echo "Cleaning up past deployments..."
+                sh "export PYTHONPATH=\$PYTHONPATH:\$(pwd)/src && \${VENV_PATH}/bin/python3 -m probeweave.cleanup"
             }
         }
 
         stage('Register GNS3 Templates') {
             steps {
-                echo "Registering Alpine QEMU image and template..."
-                sh "${VENV_PATH}/bin/python3 register_templates.py"
+                echo "Registering Alpine QEMU image..."
+                sh "export PYTHONPATH=\$PYTHONPATH:\$(pwd)/src && \${VENV_PATH}/bin/python3 -m probeweave.templates"
             }
         }
 
         stage('Infrastructure Provisioning') {
             steps {
-                echo "Provisioning new GNS3 project and topology..."
-                sh "${VENV_PATH}/bin/python3 provision_gns3.py infrastructure.yml"
-                // Run tests for this stage
-                sh "${VENV_PATH}/bin/pytest test_infrastructure.py::test_gns3_server_reachable"
-                sh "${VENV_PATH}/bin/pytest test_infrastructure.py::test_project_provisioned"
+                echo "Provisioning new GNS3 project..."
+                sh "export PYTHONPATH=\$PYTHONPATH:\$(pwd)/src && \${VENV_PATH}/bin/python3 -m probeweave.provisioner"
             }
         }
 
         stage('Bootstrap Nodes') {
             steps {
-                echo "Bootstrapping nodes via Serial Console (Injecting Network/SSH)..."
-                sh "chmod +x bootstrap_nodes.py"
-                sh "./bootstrap_nodes.py"
-                // Verify nodes are started and SSH is up
-                sh "${VENV_PATH}/bin/pytest test_infrastructure.py::test_nodes_running"
-                sh "${VENV_PATH}/bin/pytest test_infrastructure.py::test_ssh_connectivity"
+                echo "Bootstrapping nodes..."
+                sh "export PYTHONPATH=\$PYTHONPATH:\$(pwd)/src && \${VENV_PATH}/bin/python3 -m probeweave.bootstrapper"
             }
         }
 
         stage('System Crawl (ProbeWeave)') {
             steps {
-                echo "Running ProbeWeave Ansible Crawler..."
-                sh "${VENV_PATH}/bin/ansible-playbook -i gns3_inventory.py site.yml"
+                echo "Running Crawler..."
+                sh "export PYTHONPATH=\$PYTHONPATH:\$(pwd)/src && \${VENV_PATH}/bin/ansible-playbook -i src/probeweave/inventory.py site.yml"
+            }
+        }
+
+        stage('Test & Audit') {
+            steps {
+                sh "tox"
             }
         }
 
